@@ -2,7 +2,7 @@
 
 CITLog is a secure web-based faculty attendance system developed for the College of Information Technology. The project modernizes faculty attendance recording by combining manual attendance entry, QR-assisted logging, centralized cloud storage, administrator-managed records, and cryptographic tamper detection.
 
-The system was developed as a completed academic software project and technical demonstration of how web technologies, QR workflows, and digital signatures can improve the integrity and manageability of institutional attendance records.
+The system demonstrates how web technologies, QR workflows, and digital signatures can improve the integrity and manageability of institutional attendance records.
 
 ## Live Deployment
 
@@ -52,7 +52,7 @@ The frontend is intentionally lightweight. Security-sensitive operations such as
 
 ## Security Model
 
-CITLog is designed to reduce common risks in attendance-record management while remaining appropriate for an academic web application.
+CITLog is designed to reduce common risks in attendance-record management while remaining practical for a web-based institutional system.
 
 - Supabase service credentials are used only by the server-side application.
 - Public browser code does not communicate directly with Supabase tables.
@@ -112,7 +112,6 @@ The live deployment has also been verified for:
 
 - [Deployment Guide](docs/deployment.md)
 - [Backup and Recovery Policy](docs/backup-policy.md)
-- [Paper Requirements Map](docs/paper-requirements-map.md)
 
 These documents support review, verification, and maintainability of the completed project.
 
