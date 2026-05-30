@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='CITlogo.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style2.css') }}">
+</head>
+
+<body>
+<main class="admin-shell">
+<h2>Admin Dashboard</h2>
+
+<div class="toolbar">
+<button onclick="loadData()"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+        class="bi bi-arrow-repeat" viewBox="0 0 16 16">
+        <path
+            d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z">
+        </path>
+        <path fill-rule="evenodd"
+            d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z">
+        </path>
+    </svg>
+    Refresh
+</button>
+<button onclick="openTeacherModal()">Add Teacher</button>
+<button onclick="openQrModal()">Generate QR</button>
+<button onclick="exportAttendanceCsv()">Export as CSV</button>
+<button onclick="logoutAdmin()">Logout</button>
+<button onclick="window.location.href='/'">Return to front page</button>
+</div>
+
+<p id="adminMessage" class="admin-message"></p>
+
+<table>
+    <thead>
+        <tr>
+            <th>ID <button class="sort-btn active" type="button" data-sort="id" onclick="sortTable('id', 'number')">▲</button></th>
+            <th>Teacher <button class="sort-btn" type="button" data-sort="teacher_id" onclick="sortTable('teacher_id', 'text')">▼</button></th>
+            <th>Name <button class="sort-btn" type="button" data-sort="name" onclick="sortTable('name', 'text')">▼</button></th>
+            <th>Date <button class="sort-btn" type="button" data-sort="date" onclick="sortTable('date', 'date')">▼</button></th>
+            <th>Time <button class="sort-btn" type="button" data-sort="time" onclick="sortTable('time', 'time')">▼</button></th>
+            <th>Action <button class="sort-btn" type="button" data-sort="action" onclick="sortTable('action', 'text')">▼</button></th>
+            <th>Status <button class="sort-btn" type="button" data-sort="status" onclick="sortTable('status', 'text')">▼</button></th>
+        </tr>
+    </thead>
+    <tbody id="table"></tbody>
+</table>
+
+<div class="table-actions">
+    <button class="danger-btn" onclick="openClearRecordsModal()">Clear Records</button>
+</div>
+
+<div id="qrModal" class="modal hidden">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Generate Teacher QR</h3>
+            <button class="close-btn" onclick="closeQrModal()">X</button>
+        </div>
+        <label for="teacherSelect">Teacher</label>
+        <select id="teacherSelect" onchange="loadTeacherQr()"></select>
+        <div id="teacherMeta" class="teacher-meta"></div>
+        <img id="teacherQrImage" class="qr-image hidden" alt="Teacher QR code">
+        <a id="downloadQrLink" class="download-link hidden" download>Download PNG</a>
+    </div>
+</div>
+
+<div id="teacherModal" class="modal hidden">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>Add Teacher</h3>
+            <button class="close-btn" onclick="closeTeacherModal()">X</button>
+        </div>
+        <label for="newTeacherId">Teacher ID</label>
+        <input type="text" id="newTeacherId" placeholder="Enter numeric teacher ID">
+        <label for="newTeacherFirstName">First Name</label>
+        <input type="text" id="newTeacherFirstName" placeholder="Enter first name">
+        <label for="newTeacherLastName">Last Name</label>
+        <input type="text" id="newTeacherLastName" placeholder="Enter last name">
+        <button class="primary-btn" onclick="createTeacher()">Create Teacher</button>
+        <p id="teacherFormMessage" class="teacher-meta"></p>
+    </div>
+</div>
+
+<div id="clearRecordsModal" class="modal hidden">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 id="clearModalTitle">Clear Attendance Records</h3>
+            <button class="close-btn" onclick="closeClearRecordsModal()">X</button>
+        </div>
+        <p id="clearModalMessage" class="teacher-meta"></p>
+        <div class="modal-actions">
+            <button type="button" onclick="closeClearRecordsModal()">Cancel</button>
+            <button id="clearModalExportBtn" type="button" onclick="exportAndContinueClear()">Export and proceed</button>
+            <button id="clearModalPrimaryBtn" class="danger-btn" type="button" onclick="goToFinalClearStep()">Proceed</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let cachedTeachers = [];
+let cachedAttendanceRows = [];
+let currentSort = {
+    key: "id",
+    direction: "asc",
+    type: "number"
+};
+let clearStep = 1;
+
+function compareValues(left, right, type = "text") {
+    if (type === "number") {
+        return Number(left) - Number(right);
+    }
+
+    if (type === "date") {
+        return new Date(`${left}T00:00:00`) - new Date(`${right}T00:00:00`);
+    }
+
+    if (type === "time") {
+        return new Date(`1970-01-01T${left}`) - new Date(`1970-01-01T${right}`);
+    }
+
+    return String(left).localeCompare(String(right), undefined, { sensitivity: "base" });
+}
+
+function updateSortIndicators() {
+    // Updates the arrow labels to match the active table sort.
+    document.querySelectorAll(".sort-btn").forEach(button => {
+        const isActive = button.dataset.sort === currentSort.key;
+        button.textContent = isActive && currentSort.direction === "asc" ? "▲" : "▼";
+        button.classList.toggle("active", isActive);
+    });
+}
+
+function renderAttendanceRows() {
+    // Renders the current dashboard rows after sorting.
+    const table = document.getElementById("table");
+    table.innerHTML = "";
+
+    const sortedRows = getSortedAttendanceRows();
+
+    sortedRows.forEach(row => {
+        table.innerHTML += `
+        <tr>
+            <td>${row.id}</td>
+            <td>${row.teacher_id}</td>
+            <td>${row.name}</td>
+            <td>${row.date}</td>
+            <td>${row.time}</td>
+            <td>${row.action}</td>
+            <td class="${row.valid ? 'valid' : 'tampered'}">
+                ${row.valid ? 'Valid' : 'Tampered'}
+            </td>
+        </tr>`;
+    });
+
+    updateSortIndicators();
+}
+
+function getSortedAttendanceRows() {
+    // Returns a sorted copy of the cached attendance rows.
+    return [...cachedAttendanceRows].sort((left, right) => {
+        const compare = compareValues(left[currentSort.key], right[currentSort.key], currentSort.type);
+        return currentSort.direction === "asc" ? compare : -compare;
+    });
+}
+
+function sortTable(key, type = "text") {
+    // Toggles the dashboard sort direction for a selected column.
+    if (currentSort.key === key) {
+        currentSort.direction = currentSort.direction === "asc" ? "desc" : "asc";
+    } else {
+        currentSort.key = key;
+        currentSort.direction = "asc";
+    }
+
+    currentSort.type = type;
+    renderAttendanceRows();
+}
+
+function exportAttendanceCsv() {
+    // Downloads the currently loaded attendance rows as a CSV file.
+    const rows = getSortedAttendanceRows();
+    if (!rows.length) {
+        document.getElementById("adminMessage").innerText = "There are no attendance records to export.";
+        return;
+    }
+
+    const header = ["ID", "Teacher ID", "Name", "Date", "Time", "Action", "Status"];
+    const csvRows = [
+        header.join(","),
+        ...rows.map(row => [
+            row.id,
+            row.teacher_id,
+            row.name,
+            row.date,
+            row.time,
+            row.action,
+            row.valid ? "Valid" : "Tampered"
+        ].map(value => `"${String(value).replace(/"/g, '""')}"`).join(","))
+    ];
+
+    const blob = new Blob([csvRows.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+
+    link.href = url;
+    link.download = `attendance_records_${timestamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    document.getElementById("adminMessage").innerText = "Attendance records exported as CSV.";
+}
+
+function updateClearRecordsModal() {
+    // Updates the warning modal for the current clear-records step.
+    const title = document.getElementById("clearModalTitle");
+    const message = document.getElementById("clearModalMessage");
+    const exportButton = document.getElementById("clearModalExportBtn");
+    const primaryButton = document.getElementById("clearModalPrimaryBtn");
+
+    if (clearStep === 1) {
+        title.innerText = "Export Attendance Records";
+        message.innerText = "Would you like to export the attendance records before clearing them?";
+        exportButton.innerText = "Export and proceed";
+        exportButton.onclick = exportAndContinueClear;
+        primaryButton.innerText = "Proceed";
+        primaryButton.onclick = goToFinalClearStep;
+        return;
+    }
+
+    title.innerText = "Final Clear Warning";
+    message.innerText = "You are about to permanently clear the current attendance records. Make sure you export them first if you still need a copy.";
+    exportButton.innerText = "Export";
+    exportButton.onclick = exportAttendanceCsv;
+    primaryButton.innerText = "Clear";
+    primaryButton.onclick = clearAttendanceRecords;
+}
+
+function openClearRecordsModal() {
+    // Opens the first warning step before clearing attendance rows.
+    clearStep = 1;
+    updateClearRecordsModal();
+    document.getElementById("clearRecordsModal").classList.remove("hidden");
+}
+
+function closeClearRecordsModal() {
+    // Closes the clear-records warning modal.
+    document.getElementById("clearRecordsModal").classList.add("hidden");
+}
+
+function goToFinalClearStep() {
+    // Moves the warning modal to the final clear confirmation.
+    clearStep = 2;
+    updateClearRecordsModal();
+}
+
+function exportAndContinueClear() {
+    // Exports the current records, then opens the next clear warning step.
+    exportAttendanceCsv();
+    goToFinalClearStep();
+}
+
+async function clearAttendanceRecords() {
+    // Clears attendance rows after the final admin confirmation.
+    const res = await fetch("/attendance/clear", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        }
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+        document.getElementById("adminMessage").innerText = data.error || "Could not clear attendance records.";
+        return;
+    }
+
+    document.getElementById("adminMessage").innerText = data.message;
+    closeClearRecordsModal();
+    await loadData();
+}
+
+async function loadData() {
+    // Loads the attendance records with their verification status.
+    const res = await fetch("/verify");
+    const data = await res.json();
+
+    if (!res.ok) {
+        document.getElementById("adminMessage").innerText = data.error || "Could not load attendance records.";
+        return;
+    }
+
+    cachedAttendanceRows = data.map(row => ({
+        ...row,
+        status: row.valid ? "Valid" : "Tampered"
+    }));
+    renderAttendanceRows();
+}
+
+async function logoutAdmin() {
+    // Ends the admin session and returns to the attendance terminal.
+    await fetch("/admin/logout", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        }
+    });
+    window.location.href = "/";
+}
+
+async function fetchTeachers() {
+    // Fetches the teacher list for admin tools like QR generation.
+    const res = await fetch("/teachers");
+    const data = await res.json();
+
+    if (!res.ok) {
+        throw new Error(data.error || "Could not load teachers.");
+    }
+
+    cachedTeachers = data;
+    return data;
+}
+
+async function openQrModal() {
+    // Opens the QR modal and fills the teacher dropdown.
+    document.getElementById("qrModal").classList.remove("hidden");
+    const select = document.getElementById("teacherSelect");
+    select.innerHTML = "<option>Loading...</option>";
+
+    try {
+        const teachers = await fetchTeachers();
+        select.innerHTML = teachers.map(teacher =>
+            `<option value="${teacher.id}">${teacher.id} - ${teacher.name}</option>`
+        ).join("");
+
+        if (teachers.length > 0) {
+            loadTeacherQr();
+        }
+    } catch (error) {
+        document.getElementById("teacherMeta").innerText = error.message;
+    }
+}
+
+function closeQrModal() {
+    // Closes the QR generation modal.
+    document.getElementById("qrModal").classList.add("hidden");
+}
+
+async function loadTeacherQr() {
+    // Loads the selected teacher's downloadable QR code.
+    const teacherId = document.getElementById("teacherSelect").value;
+    if (!teacherId) {
+        return;
+    }
+
+    const res = await fetch(`/teachers/${teacherId}/qr`);
+    const data = await res.json();
+    const qrImage = document.getElementById("teacherQrImage");
+    const downloadLink = document.getElementById("downloadQrLink");
+
+    if (!res.ok) {
+        document.getElementById("teacherMeta").innerText = data.error || "Could not generate QR.";
+        qrImage.classList.add("hidden");
+        downloadLink.classList.add("hidden");
+        return;
+    }
+
+    document.getElementById("teacherMeta").innerText = `${data.teacher_id} - ${data.name}`;
+    qrImage.src = `${data.qr_image_url}?t=${Date.now()}`;
+    qrImage.classList.remove("hidden");
+
+    downloadLink.href = data.download_url;
+    downloadLink.download = data.filename;
+    downloadLink.classList.remove("hidden");
+    downloadLink.innerText = `Download ${data.filename}`;
+}
+
+function openTeacherModal() {
+    // Opens the form for adding a new teacher record.
+    document.getElementById("teacherModal").classList.remove("hidden");
+    document.getElementById("teacherFormMessage").innerText = "";
+}
+
+function closeTeacherModal() {
+    // Closes the teacher creation modal.
+    document.getElementById("teacherModal").classList.add("hidden");
+}
+
+async function createTeacher() {
+    // Sends the new teacher details to the backend.
+    const id = document.getElementById("newTeacherId").value.trim();
+    const first_name = document.getElementById("newTeacherFirstName").value.trim();
+    const last_name = document.getElementById("newTeacherLastName").value.trim();
+    const formMessage = document.getElementById("teacherFormMessage");
+
+    formMessage.innerText = "Saving teacher...";
+
+    const res = await fetch("/teachers", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ id, first_name, last_name })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        formMessage.innerText = data.error || "Could not create teacher.";
+        return;
+    }
+
+    formMessage.innerText = data.message;
+    document.getElementById("adminMessage").innerText = data.message;
+    document.getElementById("newTeacherId").value = "";
+    document.getElementById("newTeacherFirstName").value = "";
+    document.getElementById("newTeacherLastName").value = "";
+    await fetchTeachers();
+    closeTeacherModal();
+}
+
+// Loads the dashboard table when the admin page opens.
+loadData();
+</script>
+</main>
+</body>
+</html>

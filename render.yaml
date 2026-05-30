@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: citlog
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: CITLOG_SIGNING_PRIVATE_KEY_B64
+        sync: false
+      - key: CITLOG_SIGNING_KEY_ID
+        value: citlog-ed25519-v1
+      - key: APP_TIMEZONE
+        value: Asia/Manila
+      - key: SESSION_HOURS
+        value: "8"
+      - key: MAX_LOGIN_ATTEMPTS
+        value: "5"
+      - key: LOGIN_COOLDOWN_SECONDS
+        value: "300"
