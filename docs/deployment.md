@@ -17,6 +17,8 @@ This guide deploys the production-aligned CITLog implementation described in the
 
 The Flask backend uses the Supabase service role key server-side. Do not expose this key in browser JavaScript or public repositories.
 
+Supabase security advisors may report `RLS Enabled No Policy` at INFO level for CITLog tables. This is intentional for the current architecture: direct browser access is denied, and all table operations go through the Flask backend. Performance advisors may report unused indexes on a new database until the live service has query history.
+
 ## 2. Signing Key Setup
 
 Generate an Ed25519 keypair:

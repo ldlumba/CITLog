@@ -63,7 +63,10 @@ create table if not exists public.audit_logs (
 
 create index if not exists idx_attendance_teacher_id_id on public.attendance (teacher_id, id desc);
 create index if not exists idx_attendance_date on public.attendance (date);
+create index if not exists idx_attendance_qr_token_id on public.attendance (qr_token_id);
 create index if not exists idx_qr_tokens_teacher_id on public.qr_tokens (teacher_id);
+create index if not exists idx_qr_tokens_issued_by_admin_id on public.qr_tokens (issued_by_admin_id);
+create index if not exists idx_teachers_created_by_admin_id on public.teachers (created_by_admin_id);
 create index if not exists idx_audit_logs_actor_created on public.audit_logs (actor_admin_id, created_at desc);
 create index if not exists idx_audit_logs_action_created on public.audit_logs (action, created_at desc);
 
