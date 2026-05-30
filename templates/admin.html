@@ -369,7 +369,8 @@ async function loadTeacherQr() {
     }
 
     document.getElementById("teacherMeta").innerText = `${data.teacher_id} - ${data.name}`;
-    qrImage.src = `${data.qr_image_url}?t=${Date.now()}`;
+    const cacheSeparator = data.qr_image_url.includes("?") ? "&" : "?";
+    qrImage.src = `${data.qr_image_url}${cacheSeparator}t=${Date.now()}`;
     qrImage.classList.remove("hidden");
 
     downloadLink.href = data.download_url;
