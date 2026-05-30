@@ -1,124 +1,96 @@
 # CITLog
 
-CITLog is a secure web-based faculty attendance system for the College of Information Technology. It supports manual and QR-assisted attendance logging, account-based administration, centralized Supabase storage, signed attendance records, QR payload validation, and tamper detection.
+CITLog is a secure web-based faculty attendance system developed for the College of Information Technology. The project modernizes faculty attendance recording by combining manual attendance entry, QR-assisted logging, centralized cloud storage, administrator-managed records, and cryptographic tamper detection.
+
+The system was developed as a completed academic software project and technical demonstration of how web technologies, QR workflows, and digital signatures can improve the integrity and manageability of institutional attendance records.
 
 ## Live Deployment
 
-The current deployment is available at:
+The deployed system is available at:
 
 [https://citlog.onrender.com](https://citlog.onrender.com)
 
-The application is deployed as a Flask web service on Render and uses Supabase Postgres for persistent storage.
+The live version is hosted as a Flask web service on Render and uses Supabase Postgres for persistent data storage.
 
-## Features
+## Core Capabilities
 
-- Manual faculty time-in and time-out logging
+- Faculty time-in and time-out logging
+- Manual teacher ID entry
 - QR-assisted attendance logging through the browser camera
-- Signed QR payloads linked to registered faculty records
-- Account-based administrator login
-- Role-aware administrative permissions
+- Administrator dashboard for reviewing attendance records
 - Faculty profile management
-- QR code generation and download
-- Attendance dashboard with verification status
-- CSV export from the dashboard
+- QR code generation and download for registered faculty
+- Attendance verification status for each record
+- CSV export from the administrative dashboard
 - Clear-record workflow with confirmation safeguards
-- Ed25519-signed attendance records
-- Tamper detection for modified attendance fields
 - Audit logging for security-relevant administrator actions
 
-## Architecture
+## Technical Overview
 
-CITLog uses a server-controlled architecture:
+CITLog follows a server-controlled architecture. Browser clients interact with Flask routes, while database access is handled by the backend. This keeps database credentials and privileged operations out of client-side code.
+
+The application is organized around several backend responsibilities:
+
+- **Flask web service:** serves the attendance terminal, administrator dashboard, and API routes.
+- **Attendance service:** records manual and QR-assisted attendance events.
+- **Cryptographic service:** signs and verifies canonical attendance payloads.
+- **QR service:** generates and validates signed QR payloads for registered faculty.
+- **Authentication service:** manages administrator login, sessions, roles, and access checks.
+- **Repository layer:** centralizes Supabase database operations.
+- **Audit logging:** records important administrator and verification actions.
+
+## System Architecture
 
 - **Frontend:** HTML, CSS, and browser JavaScript templates served by Flask
-- **Backend:** Flask routes and service modules
+- **Backend:** Python Flask routes and service modules
 - **Database:** Supabase Postgres
 - **Deployment:** Render web service
-- **Cryptography:** Ed25519 signatures through the Python `cryptography` package
+- **Cryptography:** Ed25519 signatures using the Python `cryptography` package
+- **QR processing:** Browser camera capture with backend QR decoding and validation
 
-The browser communicates with Flask routes only. Supabase access is performed server-side using a service role key stored as a deployment secret.
+The frontend is intentionally lightweight. Security-sensitive operations such as signature generation, QR payload validation, attendance verification, and database access occur on the server.
 
 ## Security Model
 
-- Supabase service credentials are never exposed to browser code.
-- All public Supabase tables have Row Level Security enabled.
+CITLog is designed to reduce common risks in attendance-record management while remaining appropriate for an academic web application.
+
+- Supabase service credentials are used only by the server-side application.
+- Public browser code does not communicate directly with Supabase tables.
+- Supabase Row Level Security is enabled on application tables.
 - Direct `anon` and `authenticated` table access is revoked.
-- Attendance records are signed over a canonical payload.
-- QR codes contain signed CITLog payloads rather than plain teacher IDs.
-- Administrator accounts use password hashes, login throttling, sessions, and role checks.
-- Security-relevant actions are written to `audit_logs`.
+- Attendance records are signed over a canonical payload containing teacher ID, date, time, and action.
+- Verification fails when signed attendance fields are modified after storage.
+- QR codes contain signed CITLog payloads instead of plain teacher IDs.
+- Administrator accounts use password hashes, login throttling, sessions, and role-aware access checks.
+- Security-relevant administrator actions are written to audit logs.
 
-## Local Development
+## Data Storage Overview
 
-Install dependencies:
+Supabase Postgres stores the system's operational records. The main data areas are:
 
-```powershell
-pip install -r requirements.txt
-```
+- **Administrator accounts:** account credentials, roles, login state, and access status
+- **Teacher records:** registered faculty identifiers and profile details
+- **QR tokens:** signed QR payload records generated from the administrator dashboard
+- **Attendance records:** signed time-in and time-out entries with verification data
+- **Audit logs:** security-relevant administrator and verification events
 
-Create a local `.env` file using `.env.example` as a reference.
+Attendance entries include both the recorded attendance fields and the cryptographic evidence needed to verify whether those fields remain unchanged.
 
-Generate an Ed25519 signing key:
+## Attendance Integrity and Tamper Detection
 
-```powershell
-python scripts/generate_keys.py
-```
+Each attendance record is transformed into a canonical payload before storage. The payload is signed using Ed25519, and the resulting signature is stored with the attendance row. During dashboard verification, CITLog reconstructs the payload and validates the stored signature.
 
-Run the Flask app:
+If a protected field such as teacher ID, date, time, or action is modified directly in the database after signing, verification fails and the dashboard marks the record as tampered. This behavior was tested on the live deployment.
 
-```powershell
-python app.py
-```
+## QR Validation
 
-For local HTTP development, set:
+Generated QR codes contain signed CITLog payloads linked to registered teacher records. During QR attendance logging, the backend validates the QR envelope, checks that the token is registered, confirms that the linked teacher is active, and then records the attendance action.
 
-```text
-SESSION_COOKIE_SECURE=false
-```
+This design avoids relying on plain teacher IDs alone as QR contents.
 
-Use secure cookies in production.
+## Verification Summary
 
-## Database Setup
-
-Apply the database schema in Supabase:
-
-```text
-sql/schema.sql
-```
-
-The schema creates the following tables:
-
-- `admin_users`
-- `teachers`
-- `qr_tokens`
-- `attendance`
-- `audit_logs`
-
-The schema also enables Row Level Security and revokes direct `anon` and `authenticated` access to application tables.
-
-## Administrator Setup
-
-Generate a password hash for the first administrator account:
-
-```powershell
-python scripts/create_admin_hash.py
-```
-
-Insert the generated values into `public.admin_users`. Supported roles are:
-
-- `viewer`
-- `admin`
-- `super_admin`
-
-## Testing
-
-Run the test suite:
-
-```powershell
-python -m pytest -q
-```
-
-The tests cover:
+The project includes automated tests and live workflow verification. The implemented test coverage includes:
 
 - attendance signing and tamper detection
 - signed QR payload generation and validation
@@ -126,34 +98,23 @@ The tests cover:
 - protected route behavior
 - basic Flask route contracts
 
-## Deployment
+The live deployment has also been verified for:
 
-The repository includes a Render Blueprint:
+- administrator login
+- teacher creation
+- QR generation and preview
+- manual attendance logging
+- QR attendance logging
+- audit-log creation
+- tamper detection on modified attendance data
 
-```text
-render.yaml
-```
-
-Required deployment secrets:
-
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `SECRET_KEY`
-- `CITLOG_SIGNING_PRIVATE_KEY_B64`
-- `CITLOG_SIGNING_KEY_ID`
-- `APP_TIMEZONE`
-- `SESSION_HOURS`
-- `MAX_LOGIN_ATTEMPTS`
-- `LOGIN_COOLDOWN_SECONDS`
-- `SESSION_COOKIE_SECURE`
-
-See [docs/deployment.md](docs/deployment.md) for deployment and verification details.
-
-## Documentation
+## Supporting Documentation
 
 - [Deployment Guide](docs/deployment.md)
 - [Backup and Recovery Policy](docs/backup-policy.md)
 - [Paper Requirements Map](docs/paper-requirements-map.md)
+
+These documents support review, verification, and maintainability of the completed project.
 
 ## License
 
